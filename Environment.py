@@ -47,7 +47,7 @@ class Environment(object):
 		
 	
 	
-	#state = [sun,tube1_intensity,bulb1_intensity,night1_intensity,bulb2_intensity,time]
+	#state = [sun,time(in minutes),tube1_intensity,bulb1_intensity,night1_intensity,bulb2_intensity]
 	#ambient light = sunlight + total of intensities of all lights
 		
 	
@@ -63,12 +63,14 @@ class Environment(object):
 			
 			for i in range(1,1+max(self.no_tube,self.no_bulb,self.no_night)):
 				if(i<=self.no_tube):
-					self.state.extend(self.tubes['tube'+str(i)].get_intensity()[:1]) #get 0th element that is luminosity from returned list
+					self.state[0]+=self.tubes['tube'+str(i)].get_intensity()[0] #get 0th element that is luminosity from returned list
 				if (i<=self.no_bulb):
-					self.state.extend(self.bulbs['bulb'+str(i)].get_intensity()[:1])
+					self.state[0]+=(self.bulbs['bulb'+str(i)].get_intensity()[0])
 				if(i<=self.no_night):
-					self.state.extend(self.nights['night'+str(i)].get_intensity()[:1])
-					
+					self.state[0]+=(self.nights['night'+str(i)].get_intensity()[0])
+		
+			self.state = [self.state[0]/15,self.state[1]/1440]
+			
 		return np.array(self.state)
 		
 		
@@ -110,9 +112,11 @@ class Environment(object):
 		self.time += 15
 			
 		self.state.extend([self.sun,self.time])
-		self.state.extend(self.luminosities)
+		self.state[0]+=np.sum(self.luminosities)
 		
 		self.dailyPowerConsumption(powers)
+		
+		self.state = [self.state[0]/15,self.state[1]/1440]
 		
 		powers[:]= []
 		
@@ -122,10 +126,11 @@ class Environment(object):
 		
 	def getReward(self, powers, required):
 		self.tot_light = self.sun + (float)(np.sum(self.luminosities))
-		tot_power = (float)(np.sum(powers))
-		r = -(0.9*abs(self.tot_light-required)) - (tot_power/(abs(required-self.tot_light+np.sum(self.luminosities))*20))
+		tot_power = np.sum(powers)
+		#r = -1.6*(abs(self.tot_light-required)) - (tot_power/(abs(required-self.tot_light+np.sum(self.luminosities))*20))
+		r = -.4*((1/15)*abs(self.tot_light-required)) - .6*((1/13)*tot_power/(abs(required-self.tot_light+np.sum(self.luminosities))*10))
 		'''		punish deviation from required			punish power consumption'''
-		
+		'''		set multiplier as .4*(1/15)				set multiplier as .6*(1/13) and denominator as 10'''
 		return r
 	
 	def getRequiredLuminosity(self):	
@@ -180,6 +185,6 @@ class Environment(object):
 		if(self.time==1440):
 			self.consumptions.append(self.consumption)
 			self.consumption = 0
-		if(self.plot_counter%96000 == 0):
+		if(self.plot_counter%(3*9600) == 0):
 			plt.plot(self.consumptions)
 			plt.show()
